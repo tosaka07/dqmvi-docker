@@ -13,6 +13,8 @@ services:
     environment:
       EULA: "TRUE"
       MEMORY: "${MEMORY:-6G}"
+      RCON_PASSWORD: "${RCON_PASSWORD:?RCON_PASSWORD must be set in .env}"
+      RCON_PORT: "${RCON_PORT:-25575}"
 
     ports:
       - "${SERVER_PORT:-25565}:25565/tcp"
@@ -30,3 +32,32 @@ services:
     stdin_open: true
     tty: true
     stop_grace_period: 1m
+
+  backup:
+    image: itzg/mc-backup:latest
+    depends_on:
+      dqmvi:
+        condition: service_started
+    restart: unless-stopped
+    environment:
+      BACKUP_INTERVAL: "10m"
+      BACKUP_NAME: "dqmvi-server"
+      BACKUP_METHOD: "tar"
+      BACKUP_ON_STARTUP: "false"
+      DEST_DIR: "/backups"
+      INITIAL_DELAY: "10m"
+      PRUNE_BACKUPS_COUNT: "10"
+      PRUNE_BACKUPS_DAYS: "3650"
+      RCON_HOST: "dqmvi"
+      RCON_PASSWORD: "${RCON_PASSWORD:?RCON_PASSWORD must be set in .env}"
+      RCON_PORT: "${RCON_PORT:-25575}"
+      SRC_DIR: "/data"
+    volumes:
+      - type: bind
+        source: ./server-data
+        target: /data
+        read_only: true
+
+      - type: bind
+        source: ./backups
+        target: /backups
