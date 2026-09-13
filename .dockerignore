@@ -1,0 +1,7 @@
+.git
+.gitignore
+.env
+mods/
+server-data/
+*.tar.gz
+*.log

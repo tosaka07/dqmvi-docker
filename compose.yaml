@@ -1,0 +1,32 @@
+services:
+  dqmvi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEOFORGE_VERSION: "${NEOFORGE_VERSION:-26.2.0.6-beta}"
+
+    container_name: dqmvi
+    restart: unless-stopped
+    init: true
+
+    environment:
+      EULA: "TRUE"
+      MEMORY: "${MEMORY:-6G}"
+
+    ports:
+      - "25565:25565/tcp"
+
+    volumes:
+      - type: bind
+        source: ./server-data
+        target: /data
+
+      - type: bind
+        source: ./mods
+        target: /data/mods
+        read_only: true
+
+    stdin_open: true
+    tty: true
+    stop_grace_period: 1m

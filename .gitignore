@@ -1,0 +1,6 @@
+.env
+mods/*.jar
+mods/VERSIONS.txt
+server-data/**
+!server-data/.gitkeep
+*.tar.gz
