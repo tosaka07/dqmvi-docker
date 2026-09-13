@@ -13,6 +13,7 @@ DQM VI本体と音声パックは、起動前に`update-mods.sh`でGitHub Releas
 ├── compose.yaml
 ├── docker-entrypoint.sh
 ├── update-mods.sh
+├── backups/       # 自動バックアップの保存先
 ├── mods/
 └── server-data/
 ```
@@ -183,6 +184,9 @@ sudo apt-get install -y jq
 cp .env.example .env
 ```
 
+バックアップ用のRCONパスワードを`.env`の`RCON_PASSWORD`へ設定します。
+英数字、ハイフン、アンダースコアだけを使用してください。
+
 Windows側で公開するポートを変更する場合は、`.env`の`SERVER_PORT`を変更します。
 コンテナ内部のNeoForgeは25565番を使い、Windows側では26789番で公開する設定にしています。
 
@@ -238,6 +242,93 @@ Docker内部の25565番と、Windows側で公開する26789番は別のポート
 
 クライアントには、サーバーと同じMinecraft、NeoForge、DQM VI本体のバージョンを用意します。
 音声パックを使う場合は、クライアント側にも`DQMVI-Voice`を配置します。
+
+## サーバーを定期バックアップする
+
+バックアップはComposeの`backup`サービスがサーバー実行中に作成します。
+通常の`docker compose up -d`でサーバーと同時に起動し、10分ごとにバックアップします。
+バックアップ前にRCON経由でワールドの保存処理を実行します。
+
+バックアップは`backups`に保存し、最新10件を残します。
+バックアップサービスが初回に起動してから10分後に最初のバックアップを作成します。
+
+`.env`にRCON用のパスワードを設定します。
+英数字、ハイフン、アンダースコアだけを使用してください。
+
+```text
+RCON_PASSWORD=十分に長いランダムなパスワード
+RCON_PORT=25575
+```
+
+設定を反映します。
+
+```bash
+mkdir -p backups
+docker compose up -d
+docker compose ps
+docker compose logs -f backup
+```
+
+RCONポートはComposeネットワーク内だけで使い、Windows側へ公開しません。
+WSLのUbuntuとDocker Desktopが停止している間はバックアップも実行されません。
+バックアップ中もMinecraftサーバーは停止しませんが、バックアップ処理中に書き換えられたファイルがある場合はログに警告が出ることがあります。
+
+## バックアップから復元する
+
+復元中は、Minecraftサーバーとバックアップサービスを停止します。
+稼働中の`server-data`を置き換えると、ワールドや設定が壊れる可能性があります。
+
+この構成のバックアップは`server-data`の内容を対象にします。
+[itzg/mc-backup](https://github.com/itzg/docker-mc-backup)の既定設定ではjarファイルをバックアップから除外するため、`mods/`は別途、バックアップ作成時と同じバージョンのファイルを用意します。
+
+### 復元するバックアップを選ぶ
+
+バックアップ一覧を確認し、復元するファイル名を`BACKUP_FILE`へ設定します。
+
+```bash
+ls -lt backups/
+BACKUP_FILE="backups/dqmvi-server-YYYY-MM-DD_HH-mm-ss.tgz"
+tar -tzf "$BACKUP_FILE" | sed -n '1,20p'
+```
+
+一覧に`world/`や`server.properties`が表示されることを確認します。
+
+### server-dataを退避して復元する
+
+現在のデータを別名へ移動してから、バックアップを`server-data`へ展開します。
+退避したディレクトリは、復元に失敗した場合や復元前へ戻す場合に使います。
+
+```bash
+RESTORE_ID="$(date +%Y%m%d-%H%M%S)"
+docker compose stop dqmvi backup
+mv server-data "server-data-before-restore-${RESTORE_ID}"
+mkdir server-data
+tar -xzf "$BACKUP_FILE" -C server-data
+```
+
+復元後にサーバーを起動し、ログを確認します。
+
+```bash
+docker compose up -d
+docker compose ps
+docker compose logs -f dqmvi
+```
+
+バックアップ作成時と同じMinecraft、NeoForge、DQM VI本体、MODのバージョンを使います。
+`update-mods.sh`は最新版を取得するため、過去のバックアップへ戻すときに自動では実行しません。
+
+### 復元前のデータへ戻す
+
+復元後の起動に問題がある場合は、サーバーを停止して退避先と入れ替えます。
+`RESTORE_ID`には、復元時に表示された値を指定します。
+
+```bash
+RESTORE_ID="復元時のRESTORE_ID"
+docker compose stop dqmvi backup
+mv server-data "server-data-failed-${RESTORE_ID}"
+mv "server-data-before-restore-${RESTORE_ID}" server-data
+docker compose up -d
+```
 
 ## MODを更新する
 
