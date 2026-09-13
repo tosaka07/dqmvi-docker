@@ -183,6 +183,13 @@ sudo apt-get install -y jq
 cp .env.example .env
 ```
 
+Windows側で公開するポートを変更する場合は、`.env`の`SERVER_PORT`を変更します。
+コンテナ内部のNeoForgeは25565番を使い、Windows側では26789番で公開する設定にしています。
+
+```text
+SERVER_PORT=26789
+```
+
 DQM VIの最新版を取得します。
 
 ```bash
@@ -214,18 +221,19 @@ docker compose ps
 同じWindows PCから接続する場合は、サーバーアドレスに次を指定します。
 
 ```text
-127.0.0.1:25565
+127.0.0.1:26789
 ```
 
 家庭内LANの別端末から接続する場合は、Windowsで`ipconfig`を実行し、WindowsのIPv4アドレスを指定します。
 
 ```text
-192.168.x.x:25565
+192.168.x.x:26789
 ```
 
 WSLやDockerコンテナの内部IPアドレスは接続先に使いません。
 
-インターネット経由で接続する場合は、WindowsファイアウォールでTCP 25565を許可し、ルーターのTCP 25565をWindows PCへ転送します。
+インターネット経由で接続する場合は、WindowsファイアウォールでTCP 26789を許可し、ルーターのTCP 26789をWindows PCへ転送します。
+Docker内部の25565番と、Windows側で公開する26789番は別のポートです。
 外部公開には不正アクセスのリスクがあるため、接続元を限定できる環境で運用します。
 
 クライアントには、サーバーと同じMinecraft、NeoForge、DQM VI本体のバージョンを用意します。
