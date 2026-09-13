@@ -13,6 +13,7 @@ DQM VI本体と音声パックは、起動前に`update-mods.sh`でGitHub Releas
 ├── compose.yaml
 ├── docker-entrypoint.sh
 ├── update-mods.sh
+├── restore-backup.sh
 ├── backups/       # 自動バックアップの保存先
 ├── mods/
 └── server-data/
@@ -281,46 +282,31 @@ WSLのUbuntuとDocker Desktopが停止している間はバックアップも実
 この構成のバックアップは`server-data`の内容を対象にします。
 [itzg/mc-backup](https://github.com/itzg/docker-mc-backup)の既定設定ではjarファイルをバックアップから除外するため、`mods/`は別途、バックアップ作成時と同じバージョンのファイルを用意します。
 
-### 復元するバックアップを選ぶ
+### 対話式スクリプトで復元する
 
-バックアップ一覧を確認し、復元するファイル名を`BACKUP_FILE`へ設定します。
-
-```bash
-ls -lt backups/
-BACKUP_FILE="backups/dqmvi-server-YYYY-MM-DD_HH-mm-ss.tgz"
-tar -tzf "$BACKUP_FILE" | sed -n '1,20p'
-```
-
-一覧に`world/`や`server.properties`が表示されることを確認します。
-
-### server-dataを退避して復元する
-
-現在のデータを別名へ移動してから、バックアップを`server-data`へ展開します。
-退避したディレクトリは、復元に失敗した場合や復元前へ戻す場合に使います。
+`restore-backup.sh`が`backups/`内のバックアップを更新日時順に表示し、選択したファイルを復元します。
+実行前に現在の`server-data`を`server-data-before-restore-日時`へ移動するため、復元前の状態を保持できます。
 
 ```bash
-RESTORE_ID="$(date +%Y%m%d-%H%M%S)"
-docker compose stop dqmvi backup
-mv server-data "server-data-before-restore-${RESTORE_ID}"
-mkdir server-data
-tar -xzf "$BACKUP_FILE" -C server-data
+./restore-backup.sh
 ```
+
+スクリプトは復元前にアーカイブの内容を表示し、`yes`を入力するまで停止やファイル移動を実行しません。
+展開に失敗した場合は、退避した`server-data`を元の場所へ戻します。
 
 復元後にサーバーを起動し、ログを確認します。
 
 ```bash
-docker compose up -d
-docker compose ps
 docker compose logs -f dqmvi
 ```
 
 バックアップ作成時と同じMinecraft、NeoForge、DQM VI本体、MODのバージョンを使います。
 `update-mods.sh`は最新版を取得するため、過去のバックアップへ戻すときに自動では実行しません。
 
-### 復元前のデータへ戻す
+### 復元前のデータへ手動で戻す
 
 復元後の起動に問題がある場合は、サーバーを停止して退避先と入れ替えます。
-`RESTORE_ID`には、復元時に表示された値を指定します。
+`RESTORE_ID`には、スクリプトが表示した退避先の日時を指定します。
 
 ```bash
 RESTORE_ID="復元時のRESTORE_ID"

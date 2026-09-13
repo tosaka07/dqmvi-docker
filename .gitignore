@@ -4,3 +4,6 @@ mods/VERSIONS.txt
 server-data/**
 !server-data/.gitkeep
 *.tar.gz
+*.tgz
+server-data-before-restore-*/
+server-data-failed-*/
