@@ -26,15 +26,130 @@ mods/DQMVI.jar
 mods/DQMVI-Voice.jar
 ```
 
-## 前提
+## Windows側でMinecraftクライアントを導入する
 
-- WindowsにDocker Desktopをインストールする
-- Docker DesktopでWSL2 based engineを有効にする
-- Docker DesktopのWSL Integrationで使用するUbuntuを有効にする
-- Minecraft Java EditionとNeoForgeの対応バージョンをクライアント側にも用意する
-- Minecraft EULAを確認し、同意したうえで使用する
+この構成で使うバージョンは次のとおりです。
 
-Ubuntu側でDockerを確認します。
+| 項目 | バージョン | 役割 |
+| --- | --- | --- |
+| Minecraft Java Edition | 26.2 | ゲーム本体のバージョン |
+| NeoForge | 26.2.0.6-beta | MinecraftにMODを読み込ませるローダー |
+| Javaランタイム | 25 | NeoForgeのインストーラーとクライアントを動かすJava |
+
+Minecraftのバージョン番号と、WindowsにインストールするJavaのバージョン番号は別のものです。
+このリポジトリのDockerサーバーはコンテナ内のJava 25を使うため、Windows側のJavaとは別に管理されます。
+
+### Minecraft Launcherをインストールする
+
+[Minecraft公式ダウンロードページ](https://www.minecraft.net/ja-jp/download)からMinecraft Launcherをインストールします。
+Minecraft Java Editionを購入済みのMicrosoftアカウントでLauncherにサインインします。
+`Minecraft: Java Edition`で`26.2`を選び、一度ゲームを起動します。
+タイトル画面が表示されたらゲームを終了します。
+
+### miseのJavaを確認する
+
+PowerShellで実行します。
+
+```powershell
+mise use --global java@temurin-25
+mise current java
+java --version
+```
+
+`java`が認識されない場合は、現在のPowerShellセッションでmiseを有効にします。
+
+```powershell
+(& mise activate pwsh) | Out-String | Invoke-Expression
+java --version
+```
+
+毎回有効にするには、PowerShellのプロファイルに次の行を追加します。
+
+```powershell
+if (-not (Test-Path $PROFILE)) {
+    New-Item -ItemType Directory -Force (Split-Path -Parent $PROFILE) | Out-Null
+    New-Item -ItemType File -Path $PROFILE | Out-Null
+}
+$activation = '(& mise activate pwsh) | Out-String | Invoke-Expression'
+if (-not (Select-String -Path $PROFILE -SimpleMatch $activation -Quiet)) {
+    Add-Content -Path $PROFILE -Value $activation
+}
+. $PROFILE
+```
+
+プロファイルを変更せずにJava 25を使う場合は、次のコマンドで確認できます。
+
+```powershell
+mise exec -- java --version
+```
+
+### NeoForgeクライアントをインストールする
+
+Minecraft Launcherを終了してから、NeoForgeのインストーラーをダウンロードします。
+
+```powershell
+$version = "26.2.0.6-beta"
+$installer = Join-Path $env:USERPROFILE "Downloads\neoforge-$version-installer.jar"
+$url = "https://maven.neoforged.net/releases/net/neoforged/neoforge/$version/neoforge-$version-installer.jar"
+Invoke-WebRequest -Uri $url -OutFile $installer
+java -jar $installer
+```
+
+`java`がまだ認識されない場合は、最後の行を次に置き換えます。
+
+```powershell
+mise exec -- java -jar $installer
+```
+
+インストーラーで`Install client`を選び、インストールを完了します。
+その後Minecraft Launcherを起動し、NeoForgeの`26.2.0.6-beta`プロファイルで一度ゲームを起動します。
+タイトル画面が表示されたらゲームを終了します。
+
+### DQM VIのクライアントMODを配置する
+
+通常のMinecraft Launcherを使う場合、クライアントMODの配置先は`%APPDATA%\.minecraft\mods`です。
+サーバー側のWSLにある`mods`ディレクトリとは別の場所です。
+
+サーバー側で取得したバージョンをWSLで確認します。
+
+```bash
+cat mods/VERSIONS.txt
+```
+
+表示された本体と音声パックのバージョンに一致するjarを、[DQM VI Releases](https://github.com/GuriguriGuriguri/DQMVI/releases)からダウンロードします。
+ダウンロードしたjarを、Windows側の`%APPDATA%\.minecraft\mods`へコピーします。
+
+PowerShellで配置先を開くには次を実行します。
+
+```powershell
+explorer.exe (Join-Path $env:APPDATA ".minecraft\mods")
+```
+
+音声パックを使わない場合は、本体のjarだけを配置します。
+クライアントをNeoForgeプロファイルで起動し、DQM VIが読み込まれることを確認します。
+
+## Docker DesktopとWSL2を準備する
+
+PowerShellでWSL2を更新します。
+
+```powershell
+wsl --update
+wsl -l -v
+```
+
+Ubuntuがまだない場合は、管理者権限のPowerShellでインストールします。
+
+```powershell
+wsl --install -d Ubuntu
+```
+
+Docker Desktopの`Settings`で次を設定します。
+
+1. `General`で`Use the WSL 2 based engine`を有効にする
+2. `Resources`の`WSL Integration`で使用するUbuntuを有効にする
+3. `Apply & Restart`を押す
+
+Ubuntuを起動し、Docker Desktopとの接続を確認します。
 
 ```bash
 docker version
@@ -42,6 +157,7 @@ docker compose version
 ```
 
 Docker Desktopを使う場合、Ubuntuへ別のDocker Engineをインストールしません。
+Minecraft EULAを確認し、同意したうえで使用します。
 
 ## 初回セットアップ
 
